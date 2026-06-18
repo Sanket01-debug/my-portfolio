@@ -5,7 +5,15 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 
+<<<<<<< Updated upstream
 // ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID);
+=======
+const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
+
+console.log("GA ID =", GA_ID);
+
+ReactGA.initialize(GA_ID);
+>>>>>>> Stashed changes
 
 function Root() {
   const [isLoading, setIsLoading] = useState(true);
