@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { motion as Motion } from 'motion/react';
 import { ThemeContext } from '../App';
 import { useContext, useMemo } from 'react';
 import ReactGA from 'react-ga4';
@@ -8,17 +8,12 @@ function Hero() {
   const { theme } = useContext(ThemeContext);
 
   const handleResume = () => {
+    if (!ReactGA.isInitialized) return;
     ReactGA.event({
       category: "Resume",
-      action: "View",
+      action: "Download",
       label: "Resume PDF",
     });
-
-    window.open(
-      "https://drive.google.com/file/d/1PZapVktiamIO6JMXF3vd1W-A46kzRUP4/view?usp=drive_link",
-      "_blank",
-      "noopener,noreferrer"
-    );
   };
 
   const handleContactScroll = (e) => {
@@ -40,7 +35,7 @@ function Hero() {
     >
       {/* Optimized background blobs - reduced opacity for performance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
+        <Motion.div
           animate={{
             scale: [1, 1.15, 1],
             x: [0, 80, 0],
@@ -54,7 +49,7 @@ function Hero() {
           className={`absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl opacity-[0.15] ${theme === "dark" ? "bg-[#b8f2e6]" : "bg-[#aed9e0]"
             }`}
         />
-        <motion.div
+        <Motion.div
           animate={{
             scale: [1, 1.2, 1],
             x: [0, -60, 0],
@@ -71,14 +66,14 @@ function Hero() {
       </div>
 
       {/* Content */}
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="text-center relative z-10 max-w-5xl mx-auto"
       >
         {/* Greeting */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -86,10 +81,10 @@ function Hero() {
             }`}
         >
           Hello! I'm
-        </motion.div>
+        </Motion.div>
 
         {/* Name - Optimized with reduced animations */}
-        <motion.h1
+        <Motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
@@ -98,7 +93,7 @@ function Hero() {
           <span className={`text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight ${theme === "dark" ? "text-[#b8f2e6]" : "text-[#5e6472]"
             }`}>
             {nameLetters.map((char, i) => (
-              <motion.span
+              <Motion.span
                 key={`${char}-${i}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -109,12 +104,12 @@ function Hero() {
                 className="inline-block"
               >
                 {char === " " ? "\u00A0" : char}
-              </motion.span>
+              </Motion.span>
             ))}
           </span>
 
           {/* Center-spreading underline */}
-          <motion.div
+          <Motion.div
             className={`absolute -bottom-2 left-1/2 h-1 rounded-full ${theme === "dark" ? "bg-[#b8f2e6]" : "bg-[#aed9e0]"
               }`}
             initial={{ width: 0, x: 0 }}
@@ -125,10 +120,10 @@ function Hero() {
             }}
             style={{ transformOrigin: "center" }}
           />
-        </motion.h1>
+        </Motion.h1>
 
         {/* Tagline */}
-        <motion.p
+        <Motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -136,10 +131,10 @@ function Hero() {
             }`}
         >
           Full-Stack Developer & Creative Thinker
-        </motion.p>
+        </Motion.p>
 
         {/* Decorative line */}
-        <motion.div
+        <Motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
           transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
@@ -148,14 +143,16 @@ function Hero() {
         />
 
         {/* CTA Buttons - Optimized layout */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 1.1, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col sm:flex-row gap-5 justify-center items-center"
         >
           {/* Primary CTA */}
-          <motion.button
+          <Motion.a
+            href={`${import.meta.env.BASE_URL}resume.pdf`}
+            download="Sanket-Resume.pdf"
             onClick={handleResume}
             whileHover={{ y: -4 }}
             whileTap={{ scale: 0.98 }}
@@ -173,10 +170,10 @@ function Hero() {
                 : "hover:shadow-[#aed9e0]/40"
               }
             `}
-            aria-label="View Resume"
+            aria-label="Download Resume"
           >
             {/* Shine effect */}
-            <motion.div
+            <Motion.div
               className="absolute inset-0 opacity-0 group-hover:opacity-100"
               style={{
                 background: theme === "dark"
@@ -195,12 +192,12 @@ function Hero() {
 
             <span className="relative z-10 flex items-center gap-2.5">
               <FileText size={20} className="flex-shrink-0" />
-              View Resume
+              Download Resume
             </span>
-          </motion.button>
+          </Motion.a>
 
           {/* Secondary CTA */}
-          <motion.a
+          <Motion.a
             href="#contact"
             onClick={handleContactScroll}
             whileHover={{ y: -4 }}
@@ -220,18 +217,18 @@ function Hero() {
               <Mail size={20} className="flex-shrink-0" />
               Get In Touch
             </span>
-          </motion.a>
-        </motion.div>
+          </Motion.a>
+        </Motion.div>
 
         {/* Scroll indicator - Optimized animation */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 1.5 }}
           className="absolute bottom-10 left-1/2 -translate-x-1/2 hidden md:block"
         >
-        </motion.div>
-      </motion.div>
+        </Motion.div>
+      </Motion.div>
     </section>
   );
 }

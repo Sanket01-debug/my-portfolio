@@ -1,13 +1,10 @@
-import emailjs from '@emailjs/browser';
-import { motion, AnimatePresence } from 'motion/react';
-import { useContext, useState, useEffect } from 'react';
+import { motion as Motion, AnimatePresence } from 'motion/react';
+import { useContext, useState, useEffect, useRef } from 'react';
 import ReactGA from 'react-ga4';
 import { ThemeContext } from '../App';
 
-// Simple input sanitization function
-const sanitizeInput = (input) => {
-  return input.replace(/[<>&"']/g, '').trim();
-};
+const CONTACT_EMAIL = 'sanketkansal2001@gmail.com';
+const CONTACT_ENDPOINT = `https://formsubmit.co/ajax/${CONTACT_EMAIL}`;
 
 // Email format validation
 const isValidEmail = (email) => {
@@ -24,7 +21,13 @@ function Contact() {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [errors, setErrors] = useState({});
+  const submitting = useRef(false);
   const { theme = 'light' } = useContext(ThemeContext);
+  const emailDraftUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
+    `Portfolio message from ${formData.name.trim() || 'a visitor'}`
+  )}&body=${encodeURIComponent(
+    `Name: ${formData.name.trim()}\nEmail: ${formData.email.trim()}\n\n${formData.message.trim()}`
+  )}`;
 
   useEffect(() => {
     if (toast) {
@@ -37,7 +40,7 @@ function Contact() {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!isValidEmail(formData.email)) newErrors.email = 'Invalid email format';
+    else if (!isValidEmail(formData.email.trim())) newErrors.email = 'Invalid email format';
     if (!formData.message.trim()) newErrors.message = 'Message is required';
     if (formData.name.length > 100) newErrors.name = 'Name must be under 100 characters';
     if (formData.email.length > 100) newErrors.email = 'Email must be under 100 characters';
@@ -47,57 +50,65 @@ function Contact() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting.current) return;
     if (!validateForm()) return;
 
-    if (
-      !import.meta.env.VITE_EMAILJS_SERVICE_ID ||
-      !import.meta.env.VITE_EMAILJS_TEMPLATE_ID ||
-      !import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-    ) {
-      setToast({ type: 'error', message: 'Configuration error. Please try again later.' });
+    submitting.current = true;
+    setIsLoading(true);
+    const submission = {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      message: formData.message.trim(),
+      _replyto: formData.email.trim(),
+      _subject: `Portfolio message from ${formData.name.trim()}`,
+      _template: 'table',
+      _honey: e.currentTarget.elements.namedItem('_honey')?.value || '',
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const response = await fetch(CONTACT_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(submission),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw Object.assign(new Error('Submission failed'), { status: response.status });
+
+      const result = await response.json();
+      if (result.success !== true && result.success !== 'true') {
+        throw new Error('Submission was not accepted');
+      }
+    } catch (err) {
+      const errorMessage = err?.status === 429
+        ? 'Too many messages. Please wait a moment or email me directly below.'
+        : err?.name === 'AbortError'
+          ? 'Sending took too long. Please try again or email me directly below.'
+          : 'Your message could not be sent. Please try again or email me directly below.';
+      setToast({ type: 'error', message: errorMessage });
       return;
+    } finally {
+      clearTimeout(timeout);
+      submitting.current = false;
+      setIsLoading(false);
     }
 
-    setIsLoading(true);
-    const sanitizedData = {
-      name: sanitizeInput(formData.name),
-      email: sanitizeInput(formData.email),
-      message: sanitizeInput(formData.message),
-    };
-
-    emailjs
-      .send(
-        import.meta.env.VITE_EMAILJS_SERVICE_ID,
-        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-        sanitizedData,
-        import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-      )
-      .then(
-        (res) => {
-          setIsLoading(false);
-          setFormData({ name: '', email: '', message: '' });
-          setErrors({});
-          setToast({ type: 'success', message: 'Message sent successfully!' });
-          if (ReactGA.isInitialized) {
-            ReactGA.event({
-              category: 'Contact Form',
-              action: 'Submit',
-              label: sanitizedData.email,
-            });
-          }
-        },
-        (err) => {
-          setIsLoading(false);
-          const errorMessage = err.text?.includes('timeout')
-            ? 'Request timed out. Please try again.'
-            : err.text?.includes('invalid')
-            ? 'Invalid configuration. Please try again later.'
-            : 'Could not send message. Try again later.';
-          setToast({ type: 'error', message: errorMessage });
-        }
-      );
+    setFormData({ name: '', email: '', message: '' });
+    setErrors({});
+    setToast({ type: 'success', message: 'Message submitted successfully!' });
+    try {
+      if (ReactGA.isInitialized) {
+        ReactGA.event({ category: 'Contact Form', action: 'Submit' });
+      }
+    } catch {
+      // Analytics must not affect a successfully sent message.
+    }
   };
 
   const handleChange = (e) => {
@@ -113,7 +124,7 @@ function Contact() {
     >
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
+        <Motion.div
           animate={{
             scale: [1, 1.2, 1],
             x: [0, 50, 0],
@@ -128,7 +139,7 @@ function Contact() {
             theme === "dark" ? "bg-[#b8f2e6]" : "bg-[#aed9e0]"
           }`}
         />
-        <motion.div
+        <Motion.div
           animate={{
             scale: [1, 1.3, 1],
             x: [0, -30, 0],
@@ -147,21 +158,21 @@ function Contact() {
 
       <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: -20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <motion.h2
+          <Motion.h2
             className={`text-5xl md:text-6xl font-bold mb-4 ${
               theme === 'dark' ? 'text-[#b8f2e6]' : 'text-[#5e6472]'
             }`}
           >
             Get In Touch
-          </motion.h2>
-          <motion.div
+          </Motion.h2>
+          <Motion.div
             initial={{ width: 0 }}
             whileInView={{ width: "6rem" }}
             viewport={{ once: true }}
@@ -170,11 +181,11 @@ function Contact() {
               theme === "dark" ? "bg-[#b8f2e6]" : "bg-[#aed9e0]"
             }`}
           />
-        </motion.div>
+        </Motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
           {/* Contact Info */}
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0, x: -60 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
@@ -196,7 +207,7 @@ function Contact() {
 
             {/* Contact Cards */}
             <div className="space-y-4">
-              <motion.div
+              <Motion.div
                 whileHover={{ scale: 1.02, x: 10 }}
                 className={`p-6 rounded-2xl backdrop-blur-sm border transition-all duration-300 ${
                   theme === 'dark'
@@ -223,9 +234,9 @@ function Contact() {
                     }`}>+91 9350297223</p>
                   </div>
                 </div>
-              </motion.div>
+              </Motion.div>
 
-              <motion.div
+              <Motion.div
                 whileHover={{ scale: 1.02, x: 10 }}
                 className={`p-6 rounded-2xl backdrop-blur-sm border transition-all duration-300 ${
                   theme === 'dark'
@@ -247,16 +258,16 @@ function Contact() {
                     <p className={`text-sm opacity-75 ${
                       theme === 'dark' ? 'text-[#aed9e0]' : 'text-[#5e6472]'
                     }`}>Email</p>
-                    <p className={`text-lg font-semibold break-all ${
+                    <a href={`mailto:${CONTACT_EMAIL}`} className={`text-lg font-semibold break-all hover:underline ${
                       theme === 'dark' ? 'text-[#b8f2e6]' : 'text-[#5e6472]'
-                    }`}>sanketkansal2001@gmail.com</p>
+                    }`}>{CONTACT_EMAIL}</a>
                   </div>
                 </div>
-              </motion.div>
+              </Motion.div>
             </div>
 
             {/* Social Links */}
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -269,7 +280,7 @@ function Contact() {
                 Connect with me
               </p>
               <div className="flex space-x-4">
-                <motion.a
+                <Motion.a
                   href="#"
                   whileHover={{ scale: 1.1, rotate: 5 }}
                   whileTap={{ scale: 0.95 }}
@@ -283,25 +294,26 @@ function Contact() {
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
                   </svg>
-                </motion.a>
+                </Motion.a>
               </div>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
 
           {/* Contact Form */}
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0, x: 60 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.2 }}
           >
-            <div className="space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6" aria-busy={isLoading}>
+              <input type="text" name="_honey" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
               {[
                 { label: 'Name', type: 'text', id: 'name' },
                 { label: 'Email', type: 'email', id: 'email' },
                 { label: 'Message', type: 'textarea', id: 'message' }
               ].map((field, idx) => (
-                <motion.div
+                <Motion.div
                   key={field.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -318,13 +330,17 @@ function Contact() {
                     {field.label}
                   </label>
                   {field.type !== 'textarea' ? (
-                    <motion.input
+                    <Motion.input
                       whileFocus={{ scale: 1.01 }}
                       type={field.type}
                       id={field.id}
                       name={field.id}
                       value={formData[field.id]}
                       onChange={handleChange}
+                      disabled={isLoading}
+                      required
+                      maxLength={100}
+                      autoComplete={field.id}
                       className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 focus:outline-none focus:ring-2 ${
                         theme === 'dark'
                           ? errors[field.id]
@@ -339,12 +355,15 @@ function Contact() {
                       aria-describedby={`${field.id}-error`}
                     />
                   ) : (
-                    <motion.textarea
+                    <Motion.textarea
                       whileFocus={{ scale: 1.01 }}
                       id={field.id}
                       name={field.id}
                       value={formData[field.id]}
                       onChange={handleChange}
+                      disabled={isLoading}
+                      required
+                      maxLength={1000}
                       rows="5"
                       className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 focus:outline-none focus:ring-2 resize-none ${
                         theme === 'dark'
@@ -363,7 +382,7 @@ function Contact() {
                   
                   <AnimatePresence>
                     {errors[field.id] && (
-                      <motion.p
+                      <Motion.p
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
@@ -374,15 +393,14 @@ function Contact() {
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                         {errors[field.id]}
-                      </motion.p>
+                      </Motion.p>
                     )}
                   </AnimatePresence>
-                </motion.div>
+                </Motion.div>
               ))}
 
-              <motion.button
-                type="button"
-                onClick={handleSubmit}
+              <Motion.button
+                type="submit"
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 disabled={isLoading}
@@ -396,7 +414,7 @@ function Contact() {
                 <span className="relative z-10 flex items-center justify-center">
                   {isLoading ? (
                     <>
-                      <motion.svg
+                      <Motion.svg
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-5 h-5 mr-2"
@@ -405,7 +423,7 @@ function Contact() {
                       >
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </motion.svg>
+                      </Motion.svg>
                       Sending...
                     </>
                   ) : (
@@ -417,16 +435,21 @@ function Contact() {
                     </>
                   )}
                 </span>
-              </motion.button>
-            </div>
-          </motion.div>
+              </Motion.button>
+              <p className={`text-sm ${theme === 'dark' ? 'text-[#aed9e0]' : 'text-[#5e6472]'}`}>
+                <a href={emailDraftUrl} className="underline underline-offset-4">
+                  Or email me directly
+                </a>
+              </p>
+            </form>
+          </Motion.div>
         </div>
       </div>
 
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0, y: 50, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.8 }}
@@ -449,7 +472,7 @@ function Contact() {
               </svg>
             )}
             <span className="font-medium">{toast.message}</span>
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
     </section>
